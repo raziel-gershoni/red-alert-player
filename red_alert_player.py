@@ -23,7 +23,8 @@ MUSIC_TIMEOUT = 30 * 60  # 30 minutes
 LED_COUNT = 32
 LED_PIN = 18
 LED_BRIGHTNESS = 0.08  # Adafruit neopixel: 0.0–1.0
-COMET_SPEED_CALM = 0.08   # green/yellow — relaxed pace
+COMET_SPEED_IDLE = 0.12   # green — slow ambient
+COMET_SPEED_CALM = 0.08   # yellow — relaxed pace
 COMET_SPEED_ALERT = 0.04  # red/orange — urgent pace
 COMET_TAIL = 6
 
@@ -120,7 +121,7 @@ try:
                 board.D18, LED_COUNT, brightness=LED_BRIGHTNESS, auto_write=False,
             )
             self._effects = {
-                "green_sweep": Comet(self._pixels, speed=COMET_SPEED_CALM, color=GREEN, tail_length=COMET_TAIL, bounce=True),
+                "green_sweep": Comet(self._pixels, speed=COMET_SPEED_IDLE, color=GREEN, tail_length=COMET_TAIL, bounce=True),
                 "yellow_sweep": Comet(self._pixels, speed=COMET_SPEED_CALM, color=YELLOW, tail_length=COMET_TAIL, bounce=True),
                 "red_sweep": Comet(self._pixels, speed=COMET_SPEED_ALERT, color=RED, tail_length=COMET_TAIL, bounce=True),
                 "red_yellow_sweep": Comet(self._pixels, speed=COMET_SPEED_ALERT, color=DARK_ORANGE, tail_length=COMET_TAIL, bounce=True),
