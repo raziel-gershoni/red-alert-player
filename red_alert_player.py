@@ -3,7 +3,6 @@
 
 import json
 import logging
-import math
 import os
 import signal
 import socket
@@ -23,16 +22,9 @@ MUSIC_TIMEOUT = 30 * 60  # 30 minutes
 
 LED_COUNT = 32
 LED_PIN = 18
-LED_BRIGHTNESS = 20
-GRID_COLS = 8
-GRID_ROWS = 4
-WAVE_STEP_FRAMES = 4
-WAVE_MIN = 0.08
-WAVE_MAX = 0.5
-LED_FREQ_HZ = 800000
-LED_DMA = 10
-LED_INVERT = False
-LED_CHANNEL = 0
+LED_BRIGHTNESS = 0.08  # Adafruit neopixel: 0.0–1.0
+COMET_SPEED = 0.04
+COMET_TAIL = 6
 
 MPV_SOCKET = "/tmp/red-alert-mpv.sock"
 FADE_DURATION = 3.0
@@ -109,23 +101,36 @@ def log(level: str, msg: str, category: str = "system") -> None:
 # ── LED Controller ─────────────────────────────────────────────────────────
 
 try:
-    from rpi_ws281x import PixelStrip, Color
+    import board
+    import neopixel
+    from adafruit_led_animation.animation.comet import Comet
+    from adafruit_led_animation.animation.rainbowsparkle import RainbowSparkle
+
+    GREEN = (0, 255, 0)
+    YELLOW = (255, 180, 0)
+    RED = (255, 0, 0)
+    DARK_ORANGE = (255, 80, 0)
 
     class LEDController:
         STATES = ("green_sweep", "yellow_sweep", "red_sweep", "red_yellow_sweep", "rainbow")
 
         def __init__(self):
-            self._strip = PixelStrip(
-                LED_COUNT, LED_PIN, LED_FREQ_HZ, LED_DMA,
-                LED_INVERT, LED_BRIGHTNESS, LED_CHANNEL,
+            self._pixels = neopixel.NeoPixel(
+                board.D18, LED_COUNT, brightness=LED_BRIGHTNESS, auto_write=False,
             )
-            self._strip.begin()
+            self._effects = {
+                "green_sweep": Comet(self._pixels, speed=COMET_SPEED, color=GREEN, tail_length=COMET_TAIL, bounce=True),
+                "yellow_sweep": Comet(self._pixels, speed=COMET_SPEED, color=YELLOW, tail_length=COMET_TAIL, bounce=True),
+                "red_sweep": Comet(self._pixels, speed=COMET_SPEED, color=RED, tail_length=COMET_TAIL, bounce=True),
+                "red_yellow_sweep": Comet(self._pixels, speed=COMET_SPEED, color=DARK_ORANGE, tail_length=COMET_TAIL, bounce=True),
+                "rainbow": RainbowSparkle(self._pixels, speed=0.03, period=2),
+            }
             self._state = "green_sweep"
             self._lock = threading.Lock()
             self._running = True
             self._thread = threading.Thread(target=self._loop, daemon=True)
             self._thread.start()
-            log("info", f"LED strip initialised ({LED_COUNT} pixels on GPIO {LED_PIN})", "system")
+            log("info", f"LED strip initialised ({LED_COUNT} pixels)", "system")
 
         def set_state(self, state: str) -> None:
             if state not in self.STATES:
@@ -139,77 +144,11 @@ try:
             with self._lock:
                 return self._state
 
-        def _fill(self, color):
-            for i in range(self._strip.numPixels()):
-                self._strip.setPixelColor(i, color)
-            self._strip.show()
-
-        @staticmethod
-        def _wheel(pos):
-            """Color wheel 0-255 → R/G/B."""
-            pos = pos % 256
-            if pos < 85:
-                return Color(pos * 3, 255 - pos * 3, 0)
-            elif pos < 170:
-                pos -= 85
-                return Color(255 - pos * 3, 0, pos * 3)
-            else:
-                pos -= 170
-                return Color(0, pos * 3, 255 - pos * 3)
-
-        def _wave_brightness(self, col, tick):
-            """Smooth cosine wave — two peaks across 8 columns."""
-            step = tick // WAVE_STEP_FRAMES
-            phase = (col - step) * math.pi / (GRID_COLS // 2)
-            return WAVE_MIN + (math.cos(phase) + 1) / 2 * (WAVE_MAX - WAVE_MIN)
-
-        def _wave_two_color(self, col, tick):
-            """Single peak wave, color sweeps L→R, changes at trough."""
-            step = tick // WAVE_STEP_FRAMES
-            shifted = step + 4
-            cycle = (shifted // GRID_COLS) % 2
-            steps_into_cycle = shifted % GRID_COLS
-            cidx = cycle if col <= steps_into_cycle else 1 - cycle
-            phase = (col - step) * math.pi * 2 / GRID_COLS
-            b = WAVE_MIN + (math.cos(phase) + 1) / 2 * (WAVE_MAX - WAVE_MIN)
-            return b, cidx
-
-        def _set_column(self, col, color):
-            for row in range(GRID_ROWS):
-                self._strip.setPixelColor(row * GRID_COLS + col, color)
-
         def _loop(self):
-            tick = 0
-            n = self._strip.numPixels()
             while self._running:
                 try:
                     state = self._get_state()
-                    if state == "green_sweep":
-                        for col in range(GRID_COLS):
-                            b = self._wave_brightness(col, tick)
-                            self._set_column(col, Color(0, int(255 * b), 0))
-                    elif state == "yellow_sweep":
-                        for col in range(GRID_COLS):
-                            b = self._wave_brightness(col, tick)
-                            self._set_column(col, Color(int(255 * b), int(180 * b), 0))
-                    elif state == "red_sweep":
-                        for col in range(GRID_COLS):
-                            b = self._wave_brightness(col, tick)
-                            self._set_column(col, Color(int(255 * b), 0, 0))
-                    elif state == "red_yellow_sweep":
-                        for col in range(GRID_COLS):
-                            b, cidx = self._wave_two_color(col, tick)
-                            if cidx == 0:
-                                self._set_column(col, Color(int(255 * b), 0, 0))
-                            else:
-                                self._set_column(col, Color(int(255 * b), int(180 * b), 0))
-                    elif state == "rainbow":
-                        for i in range(n):
-                            self._strip.setPixelColor(
-                                i, self._wheel((i * 256 // n + tick * 3) % 256))
-                    self._strip.show()
-                    tick += 1
-                    time.sleep(1 / 30)
+                    self._effects[state].animate()
                 except Exception as e:
                     log("error", f"LED thread error: {e}", "system")
                     time.sleep(1)
@@ -218,13 +157,14 @@ try:
             self._running = False
             self._thread.join(timeout=2)
             try:
-                self._fill(Color(0, 0, 0))
+                self._pixels.fill((0, 0, 0))
+                self._pixels.show()
             except Exception:
                 pass
             log("info", "LEDs off", "system")
 
 except ImportError:
-    log("warning", "rpi_ws281x not available — using FakeLEDController", "system")
+    log("warning", "neopixel/adafruit not available — using FakeLEDController", "system")
 
     class LEDController:  # type: ignore[no-redef]
         STATES = ("green_sweep", "yellow_sweep", "red_sweep", "red_yellow_sweep", "rainbow")
