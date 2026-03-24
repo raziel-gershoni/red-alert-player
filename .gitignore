@@ -7,4 +7,6 @@
 !setup.sh
 !restart.sh
 !stop.sh
+!status.sh
+!logs.sh
 !alert_log.jsonl
