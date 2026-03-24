@@ -1,0 +1,9 @@
+*
+!.gitignore
+!red_alert_player.py
+!led_test.py
+!led_diag.py
+!red-alert.service
+!setup.sh
+!restart.sh
+!alert_log.jsonl
