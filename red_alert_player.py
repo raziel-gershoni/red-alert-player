@@ -23,7 +23,8 @@ MUSIC_TIMEOUT = 30 * 60  # 30 minutes
 LED_COUNT = 32
 LED_PIN = 18
 LED_BRIGHTNESS = 0.08  # Adafruit neopixel: 0.0–1.0
-COMET_SPEED = 0.04
+COMET_SPEED_CALM = 0.08   # green/yellow — relaxed pace
+COMET_SPEED_ALERT = 0.04  # red/orange — urgent pace
 COMET_TAIL = 6
 
 MPV_SOCKET = "/tmp/red-alert-mpv.sock"
@@ -119,10 +120,10 @@ try:
                 board.D18, LED_COUNT, brightness=LED_BRIGHTNESS, auto_write=False,
             )
             self._effects = {
-                "green_sweep": Comet(self._pixels, speed=COMET_SPEED, color=GREEN, tail_length=COMET_TAIL, bounce=True),
-                "yellow_sweep": Comet(self._pixels, speed=COMET_SPEED, color=YELLOW, tail_length=COMET_TAIL, bounce=True),
-                "red_sweep": Comet(self._pixels, speed=COMET_SPEED, color=RED, tail_length=COMET_TAIL, bounce=True),
-                "red_yellow_sweep": Comet(self._pixels, speed=COMET_SPEED, color=DARK_ORANGE, tail_length=COMET_TAIL, bounce=True),
+                "green_sweep": Comet(self._pixels, speed=COMET_SPEED_CALM, color=GREEN, tail_length=COMET_TAIL, bounce=True),
+                "yellow_sweep": Comet(self._pixels, speed=COMET_SPEED_CALM, color=YELLOW, tail_length=COMET_TAIL, bounce=True),
+                "red_sweep": Comet(self._pixels, speed=COMET_SPEED_ALERT, color=RED, tail_length=COMET_TAIL, bounce=True),
+                "red_yellow_sweep": Comet(self._pixels, speed=COMET_SPEED_ALERT, color=DARK_ORANGE, tail_length=COMET_TAIL, bounce=True),
                 "rainbow": RainbowSparkle(self._pixels, speed=0.03, period=2),
             }
             self._state = "green_sweep"
