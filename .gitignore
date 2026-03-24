@@ -6,4 +6,5 @@
 !red-alert.service
 !setup.sh
 !restart.sh
+!stop.sh
 !alert_log.jsonl
