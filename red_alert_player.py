@@ -29,8 +29,8 @@ COMET_SPEED_ALERT = 0.04  # red/orange — urgent pace
 COMET_TAIL = 6
 
 MPV_SOCKET = "/tmp/red-alert-mpv.sock"
-FADE_DURATION = 3.0
-FADE_STEPS = 15
+FADE_DURATION = 5.0
+FADE_STEPS = 25
 ALERT_LOG_PATH = "/home/raziel/alert_log.jsonl"
 
 ALERT_HEADERS = {
@@ -247,12 +247,23 @@ class MusicController:
         self._playing = True
         self._start_time = time.time()
 
-        # Wait for IPC socket, then fade in
+        # Wait for IPC socket, wait for actual playback, then fade in
         if self._wait_for_socket(3.0):
+            self._wait_for_playback(10.0)
             self._fade(0, 100)
             log("info", "Music started and faded in", "music")
         else:
             log("warning", "mpv socket not available, setting volume directly", "music")
+
+    def _wait_for_playback(self, timeout: float) -> None:
+        """Wait until mpv is actually producing audio."""
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            result = self._ipc({"command": ["get_property", "time-pos"]})
+            if result and result.get("data") and result["data"] > 0:
+                return
+            time.sleep(0.2)
+        log("warning", "Playback did not start in time, fading anyway", "music")
 
     def _wait_for_socket(self, timeout: float) -> bool:
         deadline = time.time() + timeout
