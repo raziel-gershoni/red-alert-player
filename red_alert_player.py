@@ -229,6 +229,7 @@ class MusicController:
             "--no-video",
             "--shuffle",
             "--ytdl",
+            "--ao=alsa",
             f"--input-ipc-server={MPV_SOCKET}",
             "--volume=0",
             PLAYLIST_URL,
@@ -540,5 +541,38 @@ def main() -> None:
         led.cleanup()
 
 
+def demo() -> None:
+    """Demo mode: cycle through all alert states."""
+    log("info", "DEMO MODE — cycling through alert states", "system")
+
+    led = LEDController()
+    music = MusicController()
+
+    steps = [
+        ("green_sweep",  10, False, "Idle — no alerts"),
+        ("yellow_sweep", 10, False, "Other city threat"),
+        ("red_sweep",    10, False, "Our city threat"),
+        ("rainbow",      20, True,  "SHELTER — enter mamad!"),
+        ("green_sweep",  10, False, "All clear"),
+    ]
+
+    try:
+        for state, duration, play_music, desc in steps:
+            log("info", f"▶ {desc} ({duration}s)", "system")
+            led.set_state(state)
+            if play_music:
+                music.start()
+            time.sleep(duration)
+            if play_music:
+                music.stop()
+        log("info", "Demo complete", "system")
+    finally:
+        music.stop()
+        led.cleanup()
+
+
 if __name__ == "__main__":
-    main()
+    if "--demo" in sys.argv:
+        demo()
+    else:
+        main()
