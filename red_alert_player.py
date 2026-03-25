@@ -147,10 +147,17 @@ try:
                 return self._state
 
         def _loop(self):
+            prev_state = None
             while self._running:
                 try:
                     state = self._get_state()
+                    if state != prev_state:
+                        self._pixels.fill((0, 0, 0))
+                        self._pixels.show()
+                        self._effects[state].reset()
+                        prev_state = state
                     self._effects[state].animate()
+                    time.sleep(1 / 60)
                 except Exception as e:
                     log("error", f"LED thread error: {e}", "system")
                     time.sleep(1)
