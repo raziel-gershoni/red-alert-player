@@ -228,6 +228,7 @@ class MusicController:
             "mpv",
             "--no-video",
             "--shuffle",
+            "--loop-playlist=inf",
             "--ytdl",
             "--ao=alsa",
             f"--input-ipc-server={MPV_SOCKET}",
