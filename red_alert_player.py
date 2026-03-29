@@ -106,7 +106,7 @@ try:
     import board
     import neopixel
     from adafruit_led_animation.animation.comet import Comet
-    from adafruit_led_animation.animation.rainbowsparkle import RainbowSparkle
+    from adafruit_led_animation.animation.rainbow import Rainbow
 
     GREEN = (0, 255, 0)
     YELLOW = (255, 180, 0)
@@ -125,7 +125,7 @@ try:
                 "yellow_sweep": Comet(self._pixels, speed=COMET_SPEED_CALM, color=YELLOW, tail_length=COMET_TAIL, bounce=True),
                 "red_sweep": Comet(self._pixels, speed=COMET_SPEED_ALERT, color=RED, tail_length=COMET_TAIL, bounce=True),
                 "red_yellow_sweep": Comet(self._pixels, speed=COMET_SPEED_ALERT, color=DARK_ORANGE, tail_length=COMET_TAIL, bounce=True),
-                "rainbow": RainbowSparkle(self._pixels, speed=0.03, period=2),
+                "rainbow": Rainbow(self._pixels, speed=0.02, period=2),
             }
             self._state = "green_sweep"
             self._lock = threading.Lock()
