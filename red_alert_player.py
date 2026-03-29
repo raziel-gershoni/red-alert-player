@@ -342,6 +342,7 @@ class AlertPoller:
         self.music = music
         self.running = True
         self._shelter_active = False
+        self._pre_alert_active = False
         self._last_shelter_time: float | None = None
 
     def poll_once(self) -> list[dict] | None:
@@ -410,6 +411,9 @@ class AlertPoller:
             if self._shelter_active:
                 log("debug", "Alert ended — stay in mamad, waiting for all-clear", "rocket")
                 return
+            if self._pre_alert_active:
+                log("debug", "Pre-alert still active — waiting for all-clear or alert", "pre_alert")
+                return
             log("debug", "No active alerts", "quiet")
             self.led.set_state("green_sweep")
             return
@@ -454,6 +458,7 @@ class AlertPoller:
             self.led.set_state("rainbow")
             self.music.start()
             self._shelter_active = True
+            self._pre_alert_active = False
             self._last_shelter_time = time.time()
         elif our_event_end:
             if self._shelter_active:
@@ -463,10 +468,15 @@ class AlertPoller:
                 self._last_shelter_time = None
             else:
                 log("info", f"✅ Event end (cat 10) for {CITY} — all clear", "all_clear")
+            self._pre_alert_active = False
             self.led.set_state("green_sweep")
         elif our_pre_alert:
             log("warning", f"⚠ Pre-alert (cat 10) for {CITY} — be near mamad", "pre_alert")
-            self.led.set_state("red_yellow_sweep")
+            if other_threat:
+                self.led.set_state("red_yellow_sweep")
+            else:
+                self.led.set_state("red_sweep")
+            self._pre_alert_active = True
         elif our_other_threat:
             threat_names = [CAT_NAMES.get(c, f"cat {c}") for c in sorted(our_other_threat)]
             log("warning", f"⚠ {', '.join(threat_names)} alert for {CITY}!", "pre_alert")
@@ -503,6 +513,7 @@ class AlertPoller:
                         self.music.stop()
                         self.led.set_state("green_sweep")
                         self._shelter_active = False
+                        self._pre_alert_active = False
                         self._last_shelter_time = None
             except Exception as e:
                 log("error", f"Unexpected error in poll loop: {e}", "system")
