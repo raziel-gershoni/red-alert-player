@@ -489,7 +489,10 @@ class AlertPoller:
         elif other_threat:
             threat_cats = set(CAT_NAMES) - DRILL_CATS - {10}
             self._log_other_city_alerts(alerts, threat_cats, "Alerts for other cities", "other_city")
-            self.led.set_state("yellow_sweep")
+            if self._pre_alert_active:
+                self.led.set_state("red_yellow_sweep")
+            else:
+                self.led.set_state("yellow_sweep")
         elif other_info:
             self._log_other_city_alerts(alerts, DRILL_CATS | {10}, "ℹ Other cities info/drills", "quiet")
             self.led.set_state("green_sweep")
