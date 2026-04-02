@@ -495,9 +495,15 @@ class AlertPoller:
                 self.led.set_state("yellow_sweep")
         elif other_info:
             self._log_other_city_alerts(alerts, DRILL_CATS | {10}, "ℹ Other cities info/drills", "quiet")
-            self.led.set_state("green_sweep")
+            if self._pre_alert_active:
+                self.led.set_state("red_sweep")
+            else:
+                self.led.set_state("green_sweep")
         else:
-            self.led.set_state("green_sweep")
+            if self._pre_alert_active:
+                self.led.set_state("red_sweep")
+            else:
+                self.led.set_state("green_sweep")
 
     def run(self) -> None:
         log("info", f"Polling {ALERT_URL} every {POLL_INTERVAL}s for city: {CITY}", "system")
