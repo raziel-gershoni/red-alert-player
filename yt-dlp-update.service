@@ -1,0 +1,13 @@
+[Unit]
+Description=Update yt-dlp (keeps red-alert music/YouTube extraction working)
+# YouTube regularly breaks older yt-dlp; a stale copy caused a silent music
+# failure during a real alert on 2026-06-07. This refreshes it on a timer.
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Installs latest into /usr/local (shadows the apt copy at /usr/bin).
+# --ignore-installed avoids pip refusing to uninstall the apt-managed package.
+ExecStart=/usr/bin/python3 -m pip install -U --break-system-packages --ignore-installed --root-user-action=ignore yt-dlp
+# red-alert spawns mpv (and thus yt-dlp) fresh per alert, so no restart is needed.

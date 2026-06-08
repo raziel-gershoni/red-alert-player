@@ -29,6 +29,7 @@ COMET_SPEED_ALERT = 0.04  # red/orange — urgent pace
 COMET_TAIL = 6
 
 MPV_SOCKET = "/tmp/red-alert-mpv.sock"
+MPV_LOG_PATH = "/tmp/red-alert-mpv.log"  # mpv stdout+stderr — captured so failures (ytdl/ALSA) are visible
 FADE_DURATION = 5.0
 FADE_STEPS = 25
 ALERT_LOG_PATH = "/home/raziel/alert_log.jsonl"
@@ -196,6 +197,7 @@ except ImportError:
 class MusicController:
     def __init__(self):
         self._proc: subprocess.Popen | None = None
+        self._log_file = None  # open file handle mpv writes its stdout+stderr to
         self._playing = False
         self._start_time: float = 0
         self._lock = threading.Lock()
@@ -204,11 +206,21 @@ class MusicController:
     def playing(self) -> bool:
         with self._lock:
             if self._playing and self._proc is not None:
-                if self._proc.poll() is not None:
-                    log("warning", "mpv process died unexpectedly", "music")
+                rc = self._proc.poll()
+                if rc is not None:
+                    log("error", f"mpv died (exit {rc}) — MUSIC STOPPED. Last mpv output:\n{self._mpv_log_tail()}", "music")
                     self._playing = False
                     self._proc = None
             return self._playing
+
+    def _mpv_log_tail(self, lines: int = 12) -> str:
+        """Last few lines of mpv's output — surfaces the real failure cause."""
+        try:
+            with open(MPV_LOG_PATH, "r", encoding="utf-8", errors="replace") as f:
+                tail = [ln.rstrip() for ln in f.readlines()[-lines:] if ln.strip()]
+            return "\n".join(f"    mpv| {ln}" for ln in tail) or "    mpv| (no output)"
+        except Exception:
+            return "    mpv| (log unavailable)"
 
     def start(self) -> None:
         if self.playing:
@@ -237,10 +249,18 @@ class MusicController:
         ]
         log("info", "Starting mpv…", "music")
         try:
+            # Capture mpv's stdout+stderr to a log file so failures (yt-dlp
+            # extraction errors, ALSA device errors, …) are visible afterwards.
+            if self._log_file is not None:
+                try:
+                    self._log_file.close()
+                except Exception:
+                    pass
+            self._log_file = open(MPV_LOG_PATH, "w", encoding="utf-8")
             self._proc = subprocess.Popen(
                 cmd,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
+                stdout=self._log_file,
+                stderr=subprocess.STDOUT,
             )
         except Exception as e:
             log("error", f"Failed to start mpv: {e}", "music")
@@ -249,23 +269,41 @@ class MusicController:
         self._playing = True
         self._start_time = time.time()
 
-        # Wait for IPC socket, wait for actual playback, then fade in
-        if self._wait_for_socket(3.0):
-            self._wait_for_playback(10.0)
-            self._fade(0, 100)
-            log("info", "Music started and faded in", "music")
-        else:
-            log("warning", "mpv socket not available, setting volume directly", "music")
+        # Stage 1: wait for the IPC control socket.
+        if not self._wait_for_socket(3.0):
+            rc = self._proc.poll()
+            if rc is not None:
+                log("error", f"mpv exited (code {rc}) before audio — NO MUSIC. Cause:\n{self._mpv_log_tail()}", "music")
+                self._playing = False
+                self._proc = None
+            else:
+                log("error", f"mpv socket never came up — cannot control playback. Cause:\n{self._mpv_log_tail()}", "music")
+            return
 
-    def _wait_for_playback(self, timeout: float) -> None:
-        """Wait until mpv is actually producing audio."""
+        # Stage 2: wait for audio to actually start, then fade in.
+        if self._wait_for_playback(10.0):
+            self._fade(0, 100)
+            log("info", "Music playing and faded in ✓", "music")
+        else:
+            rc = self._proc.poll()
+            if rc is not None:
+                log("error", f"mpv died (code {rc}) during startup — NO MUSIC. Cause:\n{self._mpv_log_tail()}", "music")
+                self._playing = False
+                self._proc = None
+            else:
+                log("error", f"mpv is running but produced NO AUDIO after 10s — check audio device. Cause:\n{self._mpv_log_tail()}", "music")
+
+    def _wait_for_playback(self, timeout: float) -> bool:
+        """Wait until mpv is actually producing audio. Returns True iff playback started."""
         deadline = time.time() + timeout
         while time.time() < deadline:
+            if self._proc is not None and self._proc.poll() is not None:
+                return False  # mpv already exited — no point waiting
             result = self._ipc({"command": ["get_property", "time-pos"]})
             if result and result.get("data") and result["data"] > 0:
-                return
+                return True
             time.sleep(0.2)
-        log("warning", "Playback did not start in time, fading anyway", "music")
+        return False
 
     def _wait_for_socket(self, timeout: float) -> bool:
         deadline = time.time() + timeout
@@ -320,6 +358,12 @@ class MusicController:
                 self._proc.wait(timeout=2)
             self._playing = False
             self._proc = None
+            if self._log_file is not None:
+                try:
+                    self._log_file.close()
+                except Exception:
+                    pass
+                self._log_file = None
             log("info", "Music stopped", "music")
 
     def check_timeout(self) -> bool:

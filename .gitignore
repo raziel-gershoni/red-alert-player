@@ -4,6 +4,8 @@
 !led_test.py
 !led_diag.py
 !red-alert.service
+!yt-dlp-update.service
+!yt-dlp-update.timer
 !setup.sh
 !restart.sh
 !stop.sh
