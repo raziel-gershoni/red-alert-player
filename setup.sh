@@ -18,8 +18,8 @@ cp /home/raziel/yt-dlp-update.timer /etc/systemd/system/yt-dlp-update.timer
 systemctl daemon-reload
 systemctl enable --now yt-dlp-update.timer
 
-echo "(Optional) Install deno JS runtime for robust yt-dlp YouTube extraction:"
-echo "  curl -fsSL https://deno.land/install.sh | sudo DENO_INSTALL=/usr/local sh"
+echo "Installing deno JS runtime (helps yt-dlp solve YouTube JS challenges)…"
+npm install -g deno || echo "  (deno install skipped — install manually if YouTube extraction degrades)"
 
 echo "=== Done! ==="
 echo "Check status: systemctl status red-alert"
