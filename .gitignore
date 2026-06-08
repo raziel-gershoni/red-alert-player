@@ -1,5 +1,6 @@
 *
 !.gitignore
+!README.md
 !red_alert_player.py
 !led_test.py
 !led_diag.py
